@@ -69,3 +69,20 @@ class DiagMvnBBVI(BBVI):
         z = np.exp(lam[D:]) * eps + lam[None, :D]
         return z
 
+    def callback(self, th, t, g, tskip=20, n_samps=10):
+        """ custom callback --- prints statistics of all gradient comps"""
+        if t % tskip == 0:
+            fval = self.elbo_mc(th, n_samps=n_samps)
+            gm, gv = np.abs(g[:self.D]), np.abs(g[self.D:])
+            print \
+"""
+iter {t}; val = {val}, abs gm = {m} [{mlo}, {mhi}]
+                           gv = {v} [{vlo}, {vhi}]
+""".format(t=t, val="%2.4f"%fval,
+                m  ="%2.4f"%np.mean(gm),
+                mlo="%2.4f"%np.percentile(gm, 1.),
+                mhi="%2.4f"%np.percentile(gm, 99.),
+                v  ="%2.4f"%np.mean(gv),
+                vlo="%2.4f"%np.percentile(gv, 1.),
+                vhi="%2.4f"%np.percentile(gv, 99.))
+

@@ -29,8 +29,8 @@ data {
   int<lower=0> K_new[N];    // new trials
   int<lower=0> y_new[N];    // new successes
 }
-
 """
+
 stan_params = \
 """
 parameters {
@@ -38,8 +38,8 @@ parameters {
   real<lower=1> kappa;                // population concentration
   vector<lower=0, upper=1>[N] theta;  // chance of success 
 }
-
 """
+
 stan_model = \
 """
 model {
@@ -47,7 +47,6 @@ model {
   theta ~ beta(phi * kappa, (1 - phi) * kappa);  // prior
   y ~ binomial(K, theta);                        // likelihood
 }
-
 """
 
 # equivalent numpy model
@@ -119,3 +118,16 @@ def lnp(logit_phi, log_kappa, logit_theta):
 
 # posterior dimension
 D = df.shape[0] + 2
+
+
+if __name__=="__main__":
+
+    import pystan
+    mod = pystan.stan(model_code=stan_data + stan_params + stan_model,
+                      data = data_dict,
+                      iter  =5000,
+                      chains=4)
+    samps = mod.extract()
+    sm    = pystan.StanModel(model_code=stan_data + stan_params + stan_model)
+    sm.optimizing(data=data_dict)
+

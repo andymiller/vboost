@@ -62,10 +62,14 @@ class NPVI(object):
             # first-order approximation (L1): optimize mu, one component at a time
             print " ... optimizing mus "
             for n in xrange(N):
+                print " ... %d / %d " % (n, N)
                 fun, gfun = self.make_elbo1_funs(theta, n)
                 res = minimize(fun, x0=theta[n,:D], jac=gfun,
                                     method='L-BFGS-B', options=opts)
                 theta[n,:D] = res.x
+
+            #print theta[:,:D]
+            #print " ... elbo: ", self.mc_elbo(theta)
 
             # second-order approximation (L2): optimize s2
             print " ... optimizing sigmas"
@@ -104,6 +108,8 @@ class NPVI(object):
 
         # create lower bound to entropy as a function of just one n
         lbn, _ = make_lower_bound_MoGn(theta, n, s2min=1e-7)
+        #lnqn = make_lnqn(theta, n, s2min=1e-7)
+        #print "lnqn vs lbn: %2.4f, %2.4f"%(lnqn(theta[n,:D]), lbn(theta[n,:D]))
 
         def elbo1(thn):
             """ elbo with respect to mean parameter n """
@@ -129,8 +135,6 @@ class NPVI(object):
             """ elbo with respect to mean parameter n """
             s2 = np.exp(lns2) + self.s2min
             return -.5*np.dot(s2,h) / float(N) - lbs(lns2)
-
-            #-1. * (lbs(lns2) - .5*np.dot(s2, h)) / float(N)
 
         return elbo2, grad(elbo2)
 
@@ -221,6 +225,39 @@ def make_lower_bound_MoGn(theta, n, s2min=1e-7):
     return lbn, lbs
 
 
+#def make_lnqn(theta, n, s2min=1e-7):
+#    """ creates the simple function ln q_n (right below eq (7) in the paper)
+#
+#    Computes:
+#        q_n = 1/N sum_j N( mu_n | mu_j, s_n + s_j )
+#        as a function of mu_n
+#
+#    """
+#    N, Dpp = theta.shape
+#    D      = Dpp-1
+#
+#    # unpack
+#    mus = theta[:, :D]
+#    s2  = np.exp(theta[:, -1]) + s2min
+#    sn  = s2[n] + s2
+#
+#    mus_non = np.row_stack([ mus[:n, :], mus[n+1:, :] ])
+#    s_nlast = np.concatenate([ sn[:n], sn[n+1:], [sn[n]] ])
+#
+#    def lnqn(thn):
+#
+#        thmat = build_thman(thn)
+#        # dist of thn to all other j = 1, ... , N
+#        Sn = np.sum((thn - mus_non)**2, axis = 1)
+#        S  = np.concatenate([Sn, [0.]])
+#
+#        # log gaussian for each component
+#        lnP  = (-.5*S/s_nlast) - .5*D*np.log(2*np.pi) - .5*D*np.log(s_nlast)
+#        return scpm.logsumexp(lnP) - np.log(N)
+#
+#    return lnqn
+
+
 from autograd.util import nd
 def numeric_hessian_diag(fun, th):
     D     = len(th)
@@ -301,8 +338,8 @@ if __name__=="__main__":
 
         # compute Hmc
         nsamps = 1000
-        z = mogsamples(nsamps, theta)
-        lls = moglogpdf(z, theta)
+        z      = mogsamples(nsamps, theta)
+        lls    = moglogpdf(z, theta)
         Hmc    = -np.mean(lls)
         Hmc_hi = Hmc + 3*np.std(lls) / np.sqrt(nsamps)
 
@@ -336,8 +373,8 @@ if __name__=="__main__":
     # Test NVPI on a small, 2d example  #
     #####################################
     from aip.vboost import mog
-    means  = np.array([ [1., 1.], [-1., -1.] ])
-    covs   = np.array([ 2*np.eye(2), 1*np.eye(2) ])
+    means  = np.array([ [1., 1.], [-1., -1.], [-1, 1] ])
+    covs   = np.array([ 2*np.eye(2), 1*np.eye(2), 1*np.eye(2) ])
     icovs  = np.array([np.linalg.inv(c) for c in covs])
     lndets = np.array([np.linalg.slogdet(c)[1] for c in covs])
     pis    = np.ones(means.shape[0]) / float(means.shape[0])
@@ -345,11 +382,11 @@ if __name__=="__main__":
     D      = 2
 
     # create npvi object
-    Ncomp = 3
-    theta0 = np.column_stack([ 10*np.random.randn(Ncomp, D),
-                               -3*np.ones(Ncomp) ])
+    Ncomp = 5
+    theta0 = np.column_stack([ 5*np.random.randn(Ncomp, D),
+                               -1*np.ones(Ncomp) ])
     npvi = NPVI(lnpdf, D=2)
-    mu, s2, elbo_vals, theta = npvi.run(theta0.copy())
+    mu, s2, elbo_vals, theta = npvi.run(theta0.copy(), verbose=True)
     print elbo_vals
 
     # plot result
