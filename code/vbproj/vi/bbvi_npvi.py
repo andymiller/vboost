@@ -52,7 +52,7 @@ class NPVI(object):
         # set LBFGS optim arguments
         disp = 10 if verbose else None
         opts = {'disp': disp, 'maxiter': 5000,
-                'gtol':1e-7, 'ftol':1e-7, 'factr':1e2}
+                'gtol':1e-7, 'ftol':1e-7} #, 'factr':1e2}
         elbo_vals = np.zeros(niter)
 
         for ii in xrange(niter):
