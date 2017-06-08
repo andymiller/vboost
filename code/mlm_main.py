@@ -84,6 +84,7 @@ def mfvi_init():
 
     niter = 1000
     lam = np.random.randn(mfvi.num_variational_params) * .01
+    lam[D:] = -1.
     mc_opt = FilteredOptimization(
                   mc_grad_fun,
                   lam.copy(),
@@ -91,7 +92,7 @@ def mfvi_init():
                   grad_filter = AdamFilter(),
                   fun = lambda lam, t: mfvi.elbo_mc(lam, n_samps=1000),
                   callback=mfvi.callback)
-    mc_opt.run(num_iters=niter, step_size=.1)
+    mc_opt.run(num_iters=niter, step_size=.05)
     return mc_opt.params.copy()
 
 
@@ -116,20 +117,20 @@ if args.vboost:
                          break_condition='percent')
 
     # iteratively add comps
-    for k in xrange(10):
+    for k in xrange(args.ncomp):
 
         # initialize new comp w/ weighted EM scheme
         (init_prob, init_comp) = \
             vbobj.fit_mvn_comp_iw_em(new_rank = comp.rank,
                                      num_samples=2000,
-                                     importance_dist = 't-mixture', #'gauss-mixture',
+                                     importance_dist = 'gauss-mixture',
                                      use_max_sample=False)
         init_prob = np.max([init_prob, .5])
 
         # fit new component
         vbobj.fit_new_comp(init_comp = init_comp,
                            init_prob = init_prob,
-                           max_iter  = 100,
+                           max_iter  = 1000,
                            step_size = .05,
                            num_new_component_samples   =10*D,
                            num_previous_mixture_samples=10*D,
