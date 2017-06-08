@@ -63,6 +63,17 @@ def make_model(model_name):
 
 np.random.seed(args.seed)
 lnpdf, D, _ = make_model(args.model)
+print \
+"""
+=========== mlm_main ==============
+
+  model                    : {model}
+  posterior dimension (D)  : {D}
+  output dir               : {output_dir}
+
+""".format(model=args.model, D=D, output_dir=args.output)
+print args
+
 
 # single component initialization
 def mfvi_init():
@@ -83,43 +94,25 @@ def mfvi_init():
     mc_opt.run(num_iters=niter, step_size=.1)
     return mc_opt.params.copy()
 
+
 ###########################
 # Variational Boosting    #
 ###########################
 
 if args.vboost:
 
-    ###############################
-    # single component MFVI first #
-    ###############################
-    mfvi = vi.DiagMvnBBVI(lnpdf, D, lnpdf_is_vectorized=True)
-    elbo_grad = grad(mfvi.elbo_mc)
-    def mc_grad_fun(lam, t):
-        return -1.*elbo_grad(lam, n_samps=1024) #args.vboost_nsamps)
-
-    niter = 1000
-    lam = np.random.randn(mfvi.num_variational_params) * .01
-    mc_opt = FilteredOptimization(
-                  mc_grad_fun,
-                  lam.copy(),
-                  save_grads = False,
-                  grad_filter = AdamFilter(),
-                  fun = lambda lam, t: mfvi.elbo_mc(lam, n_samps=1000),
-                  callback=mfvi.callback)
-
-    mc_opt.run(num_iters=niter, step_size=.1)
+    # single component MFVI first
+    mfvi_lam  = mfvi_init()
     mfvi_file = os.path.join(args.output, "mfvi.npy")
-    np.save(mfvi_file, mc_opt.params.copy())
+    np.save(mfvi_file, mfvi_lam)
 
-    #############################################
-    # Variational Boosting Iterations           #
-    #############################################
+    # Variational Boosting Object (with initial component
     from vbproj.vi.vboost import mog_bbvi
-    comp = LRDComponent(D, rank=0, lam=mc_opt.params.copy())
+    comp = LRDComponent(D, rank=0, lam=mfvi_lam)
     vbobj = vi.MixtureVI(lambda z, t: lnpdf(z),
-                         D = D,
-                         comp_list = [(1., comp)],
-                         fix_component_samples=True,
+                         D                     = D,
+                         comp_list             = [(1., comp)],
+                         fix_component_samples = True,
                          break_condition='percent')
 
     # iteratively add comps
@@ -130,8 +123,6 @@ if args.vboost:
             vbobj.fit_mvn_comp_iw_em(new_rank = comp.rank,
                                      num_samples=2000,
                                      importance_dist = 't-mixture', #'gauss-mixture',
-                                     #debug_ax = dax,
-                                     #iw_debug_ax = iax,
                                      use_max_sample=False)
         init_prob = np.max([init_prob, .5])
 
@@ -170,23 +161,6 @@ if args.npvi:
     init_with_mfvi = True
     if init_with_mfvi:
         mfvi_lam = mfvi_init()
-
-        # single component MFVI first
-        #mfvi = vi.DiagMvnBBVI(lnpdf, D, lnpdf_is_vectorized=True)
-        #elbo_grad = grad(mfvi.elbo_mc)
-        #def mc_grad_fun(lam, t):
-        #    return -1.*elbo_grad(lam, n_samps=args.vboost_nsamps)
-
-        #niter = 1000
-        #lam = np.random.randn(mfvi.num_variational_params) * .01
-        #mc_opt = FilteredOptimization(
-        #              mc_grad_fun,
-        #              lam.copy(),
-        #              save_grads  = False,
-        #              grad_filter = AdamFilter(),
-        #              fun = lambda lam, t: mfvi.elbo_mc(lam, n_samps=1000),
-        #              callback = mfvi.callback)
-        #mc_opt.run(num_iters=niter, step_size=.005)
 
         # initialize theta
         theta_mfvi = np.atleast_2d(np.concatenate([ mfvi_lam[:D],
