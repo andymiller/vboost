@@ -86,6 +86,13 @@ class MixtureVI:
                            for i in indices ])
         return samps
 
+    def elbo_mc(self, comp_list=None, n_samps=1000):
+        qlnpdf, qsample = components.comp_list_to_lnpdf(comp_list)
+        z    = qsample(n_samps)
+        lnqs = qlnpdf(z)
+        lls  = self.lnpdf(z)
+        return np.mean(lls - lnqs)
+
 
 #############################################
 # Main fitting method in this module        #

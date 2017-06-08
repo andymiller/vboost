@@ -140,7 +140,6 @@ class NPVI(object):
 
     def mc_elbo(self, theta, nsamps=1000):
         """ monte carlo estimator of the ELBO """
-        nsamps = 1000
         z      = mogsamples(nsamps, theta)
         lnqs   = moglogpdf(z, theta)
         llikes = self.lnpdf(z)
