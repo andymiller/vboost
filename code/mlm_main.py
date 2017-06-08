@@ -56,14 +56,32 @@ def make_model(model_name):
         lnpdft      = lambda z, t: np.squeeze(lnpdf_flat(z, t))
         lnpdf       = lambda z: np.squeeze(lnpdf_flat(z, 0))
         D           = baseball.D
-        return lnpdf, D
+        return lnpdf, D, None
     elif model_name == "frisk":
-        lnpdf, unpack, D, sdf, pnames = frisk.make_model_funs()
-        return lnpdf, D
+        lnpdf, unpack, D, sdf, pnames = frisk.make_model_funs(precinct_type=1)
+        return lnpdf, D, pnames
 
 np.random.seed(args.seed)
-lnpdf, D = make_model(args.model)
+lnpdf, D, _ = make_model(args.model)
 
+# single component initialization
+def mfvi_init():
+    mfvi = vi.DiagMvnBBVI(lnpdf, D, lnpdf_is_vectorized=True)
+    elbo_grad = grad(mfvi.elbo_mc)
+    def mc_grad_fun(lam, t):
+        return -1.*elbo_grad(lam, n_samps=1024) #args.vboost_nsamps)
+
+    niter = 1000
+    lam = np.random.randn(mfvi.num_variational_params) * .01
+    mc_opt = FilteredOptimization(
+                  mc_grad_fun,
+                  lam.copy(),
+                  save_grads = False,
+                  grad_filter = AdamFilter(),
+                  fun = lambda lam, t: mfvi.elbo_mc(lam, n_samps=1000),
+                  callback=mfvi.callback)
+    mc_opt.run(num_iters=niter, step_size=.1)
+    return mc_opt.params.copy()
 
 ###########################
 # Variational Boosting    #
@@ -151,27 +169,28 @@ if args.npvi:
 
     init_with_mfvi = True
     if init_with_mfvi:
+        mfvi_lam = mfvi_init()
 
         # single component MFVI first
-        mfvi = vi.DiagMvnBBVI(lnpdf, D, lnpdf_is_vectorized=True)
-        elbo_grad = grad(mfvi.elbo_mc)
-        def mc_grad_fun(lam, t):
-            return -1.*elbo_grad(lam, n_samps=args.vboost_nsamps)
+        #mfvi = vi.DiagMvnBBVI(lnpdf, D, lnpdf_is_vectorized=True)
+        #elbo_grad = grad(mfvi.elbo_mc)
+        #def mc_grad_fun(lam, t):
+        #    return -1.*elbo_grad(lam, n_samps=args.vboost_nsamps)
 
-        niter = 1000
-        lam = np.random.randn(mfvi.num_variational_params) * .01
-        mc_opt = FilteredOptimization(
-                      mc_grad_fun,
-                      lam.copy(),
-                      save_grads  = False,
-                      grad_filter = AdamFilter(),
-                      fun = lambda lam, t: mfvi.elbo_mc(lam, n_samps=1000),
-                      callback = mfvi.callback)
-        mc_opt.run(num_iters=niter, step_size=.005)
+        #niter = 1000
+        #lam = np.random.randn(mfvi.num_variational_params) * .01
+        #mc_opt = FilteredOptimization(
+        #              mc_grad_fun,
+        #              lam.copy(),
+        #              save_grads  = False,
+        #              grad_filter = AdamFilter(),
+        #              fun = lambda lam, t: mfvi.elbo_mc(lam, n_samps=1000),
+        #              callback = mfvi.callback)
+        #mc_opt.run(num_iters=niter, step_size=.005)
 
         # initialize theta
-        theta_mfvi = np.atleast_2d(np.concatenate([ mc_opt.params[:D],
-                                   [2*mc_opt.params[D:].mean()] ]))
+        theta_mfvi = np.atleast_2d(np.concatenate([ mfvi_lam[:D],
+                                                    [2*mfvi_lam[D:].mean()] ]))
         mu0        = vi.bbvi_npvi.mogsamples(args.ncomp, theta_mfvi)
 
         # create npvi object
