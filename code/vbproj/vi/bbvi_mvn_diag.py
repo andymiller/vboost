@@ -2,7 +2,7 @@ import autograd.numpy as np
 import autograd.numpy.random as npr
 from autograd import grad, elementwise_grad, jacobian, hessian
 from scipy.stats import ncx2
-from aip.misc import mvn_diag_logpdf, mvn_diag_entropy
+from vbproj.misc import mvn_diag_logpdf, mvn_diag_entropy
 from .bbvi_base import BBVI
 
 

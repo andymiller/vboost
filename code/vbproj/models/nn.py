@@ -5,7 +5,7 @@ from autograd.scipy.misc import logsumexp
 from autograd import grad
 from autograd.util import flatten
 from autograd.optimizers import adam
-from aip.misc import gamma_lnpdf
+from vbproj.misc import gamma_lnpdf
 
 
 def make_nn_regression_funs(Xtrain, Ytrain,
