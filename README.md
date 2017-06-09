@@ -22,5 +22,8 @@ Authors:
 
 ### Requires
 
-* [`autograd`](https://github.com/HIPS/autograd) + its requirements (`numpy`, etc).  Our code is compatible with [this `autograd` commit](https://github.com/HIPS/autograd/tree/42a57226442417785efe3bd5ba543b958680b765).
+* [`autograd`](https://github.com/HIPS/autograd) + its requirements (`numpy`, etc).
+  Our code is compatible with [this `autograd` commit](https://github.com/HIPS/autograd/tree/42a57226442417785efe3bd5ba543b958680b765) or later.
+  You can install the master version with
+  `pip install git+git://github.com/HIPS/autograd.git@master`.
 * [`pyprind `](https://github.com/rasbt/pyprind)
