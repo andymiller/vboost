@@ -94,7 +94,7 @@ if __name__=="__main__":
                          fix_component_samples = True,
                          break_condition='percent')
 
-    for k in xrange(20):
+    for k in xrange(4):
 
         # plot with components
         fname   = os.path.join(OUTPUT_DIR, "n_comp_%d.pdf"%k)
