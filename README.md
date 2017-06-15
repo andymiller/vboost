@@ -24,3 +24,4 @@ Authors:
 
 * [`autograd`](https://github.com/HIPS/autograd) + its requirements (`numpy`, etc).  Our code is compatible with [this `autograd` commit](https://github.com/HIPS/autograd/tree/42a57226442417785efe3bd5ba543b958680b765).
 * [`pyprind `](https://github.com/rasbt/pyprind)
+* [`sampyl`](https://github.com/mcleonard/sampyl) for MCMC experiments
