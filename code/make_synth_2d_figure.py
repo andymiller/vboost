@@ -112,26 +112,28 @@ if __name__=="__main__":
         # initialize new comp w/ weighted EM scheme
         (init_prob, init_comp) = \
             vbobj.fit_mvn_comp_iw_em(new_rank = mfvi_comp.rank,
-                                     num_samples=200,
+                                     num_samples=1000,
                                      importance_dist = 'gauss-mixture',
                                      use_max_sample=False)
-        init_prob = np.max([init_prob, .5])
+        init_prob = np.min([init_prob, .5])
 
         # fit new component
         vbobj.fit_new_comp(init_comp = init_comp,
                            init_prob = init_prob,
                            max_iter  = 1000,
-                           step_size = .1,
-                           num_new_component_samples    = 200, #10*D,
-                           num_previous_mixture_samples = 200, #*D,
+                           step_size = .05,
+                           num_new_component_samples    = 100,
+                           num_previous_mixture_samples = 100,
                            fix_component_samples=True,
-                           gradient_type="standard", #component_approx_static_rho",
-                           break_condition='percent')
+                           gradient_type="component_approx_static_rho",
+                           break_condition='percent',
+                           verbose=True)
 
         comp_list = mog_bbvi.fit_mixture_weights(
-			vbobj.comp_list, vbobj.lnpdf,
-                        num_iters=1000, step_size=.1,
-                        num_samps_per_component=10*D,
+                        vbobj.comp_list, vbobj.lnpdf,
+                        num_iters=1000,
+                        step_size=.1,
+                        num_samps_per_component=100,
                         ax=None)
         vbobj.comp_list = comp_list
 
