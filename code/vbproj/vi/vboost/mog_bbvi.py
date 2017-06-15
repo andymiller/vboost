@@ -127,6 +127,7 @@ def fit_new_component(comp_list,
     rho_line_search              = kwargs.get("rho_line_search", False)
     break_condition              = kwargs.get("break_condition", "percent")
     use_adam                     = kwargs.get("use_adam", True)
+    verbose                      = kwargs.get("verbose", False)
 
     print """fitting new component with params:
      step_size : {ss}
@@ -147,7 +148,7 @@ def fit_new_component(comp_list,
               num_new_component_samples=num_new_component_samples,
               fix_samples=fix_component_samples)
 
-    # define objective --- add RHO penalty for stability
+    # define objective --- can add RHO penalty for stability
     def mixture_obj(x, t):
         return -.1*mixture_elbo(x, t) #+ (1/100.)*(sigmoid(x[-1])**2)
 
@@ -164,8 +165,8 @@ def fit_new_component(comp_list,
         #                               [logit(fixed_prob_new)]])
 
     #print "Params going in: ", init_params.shape
-    print "Made objective --- value is ", mixture_obj(init_params, 0)
-    print "  made objective gradient is", grad(mixture_obj)(init_params, 0)
+    #print "Made objective --- value is ", mixture_obj(init_params, 0)
+    #print "  made objective gradient is", grad(mixture_obj)(init_params, 0)
 
     no_new_params = init_params.copy()
     no_new_params[-1] = -20
@@ -198,7 +199,7 @@ def fit_new_component(comp_list,
 
     # set up the optimization proceudre 
     if use_adam:
-        print " === optimizing with ADAM ==== "
+        print "  optimizing with ADAM "
         opt_fun = lambda cb, bc: adam(mixture_obj_grad, init_params,
                                       subopt    = ls_subopt,
                                       step_size = step_size,
@@ -348,7 +349,6 @@ def make_mixture_elbo(lntarget, comp_list, new_rank,
     C_samps    = sample_C(num_previous_mixture_samples)
     llC        = lnpdf_C(C_samps)
     lntarget_C = lntarget(C_samps, 0)
-    print llC
 
     # create the new C+1 component variational dist as a function of lam, rho
     lnpdf_Cplus_fixed_samps = lambda x, th: lnpdf_Cplus(x, th, llC=llC)
@@ -398,12 +398,11 @@ def make_mixture_elbo(lntarget, comp_list, new_rank,
         # compute mixing
         return (1. - prob_new) * Cterm + prob_new * Cpterm
 
-
     if fix_samples:
         print "Fixing eps samples"
         print "    D, r = ", D, new_rank
-        np.random.seed(42)
-        Neps = num_new_component_samples
+        #np.random.seed(42)
+        Neps     = num_new_component_samples
         eps_diag = np.random.randn(Neps, D)
         eps_lowr = np.random.randn(Neps, new_rank)
         return lambda th, i, fixed_prob_new=None: mixture_elbo(th, i, eps_lowr=eps_lowr,

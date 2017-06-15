@@ -9,6 +9,12 @@ from vbproj import vi
 from vbproj.gsmooth.opt import FilteredOptimization
 from vbproj.gsmooth.smoothers import AdamFilter
 from vbproj.vi.vboost.components import LRDComponent
+
+##################################################
+# import matplotlib with TrueType embedded fonts #
+##################################################
+import matplotlib
+matplotlib.rcParams['ps.fonttype'] = 42
 import matplotlib.pyplot as plt; plt.ion()
 import seaborn as sns; sns.set_style("white")
 import os
@@ -102,7 +108,7 @@ if __name__=="__main__":
         plt.savefig(fname, bbox_inches='tight')
         plt.close("all")
 
-        print "=========== iter %d ============="%k
+        print "\n\n=========== iter %d ============="%k
         # initialize new comp w/ weighted EM scheme
         (init_prob, init_comp) = \
             vbobj.fit_mvn_comp_iw_em(new_rank = mfvi_comp.rank,
@@ -115,9 +121,9 @@ if __name__=="__main__":
         vbobj.fit_new_comp(init_comp = init_comp,
                            init_prob = init_prob,
                            max_iter  = 1000,
-                           step_size = .05,
-                           num_new_component_samples    = 400, #10*D,
-                           num_previous_mixture_samples = 400, #*D,
+                           step_size = .1,
+                           num_new_component_samples    = 200, #10*D,
+                           num_previous_mixture_samples = 200, #*D,
                            fix_component_samples=True,
                            gradient_type="standard", #component_approx_static_rho",
                            break_condition='percent')
@@ -128,16 +134,4 @@ if __name__=="__main__":
                         num_samps_per_component=10*D,
                         ax=None)
         vbobj.comp_list = comp_list
-
-
-        # NOTE: the number of samples in new component probably has to be
-        #       greater than D --- otherwise you'll need some regularization
-        #
-        #D = 20
-        #comp_list, elbo_vals, samp_C, param_vals = \
-        #    mog_bbvi.fit_new_component(comp_list, lnpdf,
-        #                               num_iters=1000, step_size=.1,
-        #                               num_new_component_samples=10*D,
-        #                               fix_component_samples=False,
-        #                               ax = None)
 

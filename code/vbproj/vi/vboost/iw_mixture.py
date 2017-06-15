@@ -23,7 +23,8 @@ def fit_new_component(comp_list, lnpdf,
                       debug_ax=None,
                       iw_debug_ax=None,
                       use_max_sample=False,
-                      use_weighted_mean=False):
+                      use_weighted_mean=False,
+                      verbose = False):
     """
     Fit a new mixture using the importance weighted EM
 
@@ -57,7 +58,8 @@ def fit_new_component(comp_list, lnpdf,
     X, lnW = generate_reweighted_sample(comp_list, lnpdf, num_samples,
                                         importance_dist=importance_dist,
                                         df=df,
-                                        debug_ax=iw_debug_ax)
+                                        debug_ax=iw_debug_ax,
+                                        verbose=verbose)
 
     print "Use max sample? ", use_max_sample
     ##
@@ -252,7 +254,7 @@ def new_component_weighted_EM(comp_list, X, W, num_iter=5,
 
 def generate_reweighted_sample(comp_list, lnpdf, num_samples,
                                importance_dist='t-mixture',
-                               df=1000, debug_ax=None):
+                               df=1000, debug_ax=None, verbose=False):
     """ create a weighted sample (hopefully w/ stable weights)
 
         generate initial weighted sample, X, W. Then choose the top
@@ -267,7 +269,7 @@ def generate_reweighted_sample(comp_list, lnpdf, num_samples,
 
     # create first
     if importance_dist == 't-mixture':
-        print "  using mixture of scaled ts with %d dfs"%df
+        if verbose: print "  using mixture of scaled ts with %d dfs"%df
         # step 1, create the existing Mixture of T distributions
         q_sample  = lambda n: mix.mixture_of_ts_samples(n, means, chols,
                                                         pis, df=df)
@@ -275,7 +277,7 @@ def generate_reweighted_sample(comp_list, lnpdf, num_samples,
         q_logprob = lambda x: mix.mixture_of_ts_logprob(x, means, ichols,
                                                         pis, df=df)
     elif importance_dist == 'gauss-mixture':
-        print "  using mixture of gaussians as proposal distribution"
+        if verbose: print "  using mixture of gaussians as proposal distribution"
         q_logprob, q_sample, _, _ = \
             components.make_new_component_mixture_lnpdf(comp_list)
     else:
@@ -287,14 +289,15 @@ def generate_reweighted_sample(comp_list, lnpdf, num_samples,
     lnP = lnW - scpm.logsumexp(lnW)
     P   = np.exp(lnP)
 
-    print np.percentile(lnP, [1, 25, 50, 75, 99])
+    if verbose: print " weight percentiles: ", np.percentile(lnP, [1, 25, 50, 75, 99])
 
     # if a weight is much bigger than it should be (i.e. 10 times bigger, 10/N)
     # then resample it
     high_idx = np.where(lnP > np.log(10./len(lnP)))[0]
     #high_idx = np.where(lnP > upper_cutoff)[0]
-    print "  gen_weighted_sample (starting with %d samples)"%num_samples
-    print "      breaking up %d samples, (%2.2f of importance weight)" % \
+    if verbose: 
+        print "  gen_weighted_sample (starting with %d samples)"%num_samples
+        print "      breaking up %d samples, (%2.2f of importance weight)" % \
                 (len(high_idx), np.sum(P[high_idx]))
 
     old_weight = 1. - np.sum(P[high_idx])
@@ -392,7 +395,6 @@ def importance_EM(num_comp, X, W, num_iter=20):
         mod._do_mstep(X, weighted_responsibilities, mod.params,
                             mod.min_covar)
     return mod
-
 
 
 if __name__=="__main__":
