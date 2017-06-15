@@ -63,16 +63,21 @@ def make_model(model_name):
 
 np.random.seed(args.seed)
 lnpdf, D, _ = make_model(args.model)
-print \
-"""
-=========== mlm_main ==============
 
-  model                    : {model}
-  posterior dimension (D)  : {D}
-  output dir               : {output_dir}
+#
+# print script args
+#
+if __name__=="__main__":
+    print \
+    """
+    =========== mlm_main ==============
 
-""".format(model=args.model, D=D, output_dir=args.output)
-print args
+      model                    : {model}
+      posterior dimension (D)  : {D}
+      output dir               : {output_dir}
+
+    """.format(model=args.model, D=D, output_dir=args.output)
+    print args
 
 
 # single component initialization
@@ -130,26 +135,34 @@ if args.vboost:
         # fit new component
         vbobj.fit_new_comp(init_comp = init_comp,
                            init_prob = init_prob,
-                           max_iter  = 1000,
-                           step_size = .05,
+                           max_iter  = 500,
+                           step_size = .1,
                            num_new_component_samples   =10*D,
                            num_previous_mixture_samples=10*D,
                            fix_component_samples=True,
                            gradient_type="standard", #component_approx_static_rho",
                            break_condition='percent')
 
-    # after all components are added, tune the weights of each comp
-    comp_list = mog_bbvi.fit_mixture_weights(vbobj.comp_list, vbobj.lnpdf,
-                                            num_iters=1000, step_size=.25,
-                                            num_samps_per_component=10*D,
-                                            ax=None)
-    vbobj.comp_list = comp_list
+        # after all components are added, tune the weights of each comp
+        comp_list = mog_bbvi.fit_mixture_weights(vbobj.comp_list, vbobj.lnpdf,
+                                                num_iters=1000, step_size=.25,
+                                                num_samps_per_component=10*D,
+                                                ax=None)
+        vbobj.comp_list = comp_list
 
-    # save output here
-    vb_outfile = os.path.join(args.output, "vboost.pkl")
-    lam_list = [(p, c.lam) for p, c in vbobj.comp_list]
-    with open(vb_outfile, 'wb') as f:
-        pickle.dump(lam_list, f)
+        # save output here
+        vb_outfile = os.path.join(args.output,
+                                  "vboost_%d-comp_%d-rank.pkl" % \
+                                  (k, vbobj.comp_list[0][1].rank))
+        lam_list = [(p, c.lam) for p, c in vbobj.comp_list]
+        with open(vb_outfile, 'wb') as f:
+            pickle.dump(lam_list, f)
+
+    ## save output here
+    #vb_outfile = os.path.join(args.output, "vboost.pkl")
+    #lam_list = [(p, c.lam) for p, c in vbobj.comp_list]
+    #with open(vb_outfile, 'wb') as f:
+    #    pickle.dump(lam_list, f)
 
 
 #############################################

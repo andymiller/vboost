@@ -6,8 +6,8 @@ import autograd.numpy as np
 import autograd.numpy.random as npr
 from autograd import grad, elementwise_grad, jacobian
 from scipy.stats import ncx2
-from aip.misc import mvn_diag_logpdf
-from aip.misc import lowr_mvn
+from vbproj.misc import mvn_diag_logpdf
+from vbproj.misc import lowr_mvn
 from .bbvi_base import BBVI
 
 

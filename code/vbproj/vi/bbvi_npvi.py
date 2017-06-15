@@ -6,7 +6,7 @@ import autograd.numpy as np
 import autograd.numpy.random as npr
 from autograd import grad, elementwise_grad, jacobian, hessian
 from scipy.stats import ncx2
-from aip.misc import mvn_diag_logpdf, mvn_diag_entropy
+from vbproj.misc import mvn_diag_logpdf, mvn_diag_entropy
 #from .bbvi_base import BBVI
 
 from scipy.optimize import minimize
@@ -140,7 +140,6 @@ class NPVI(object):
 
     def mc_elbo(self, theta, nsamps=1000):
         """ monte carlo estimator of the ELBO """
-        nsamps = 1000
         z      = mogsamples(nsamps, theta)
         lnqs   = moglogpdf(z, theta)
         llikes = self.lnpdf(z)
@@ -283,7 +282,7 @@ def sq_dist(a, b=None):
     return np.sum(diff**2, axis=2)
 
 
-from aip.vboost import mog
+from vbproj.vi.vboost import mog
 def moglogpdf(z, theta, s2min=1e-7):
     """
     Log probability according to MoG theta --- mostly for testing entropy
@@ -372,7 +371,7 @@ if __name__=="__main__":
     #####################################
     # Test NVPI on a small, 2d example  #
     #####################################
-    from aip.vboost import mog
+    from vbproj.vboost import mog
     means  = np.array([ [1., 1.], [-1., -1.], [-1, 1] ])
     covs   = np.array([ 2*np.eye(2), 1*np.eye(2), 1*np.eye(2) ])
     icovs  = np.array([np.linalg.inv(c) for c in covs])

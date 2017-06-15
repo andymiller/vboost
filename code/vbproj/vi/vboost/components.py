@@ -170,6 +170,17 @@ def comp_list_to_matrices(comp_list):
     return means, covars, icovs, chols, lndets, pis
 
 
+def comp_list_to_lnpdf(comp_list, normalized=True):
+    means, covars, icovs, chols, lndets, pis = comp_list_to_matrices(comp_list)
+    if not normalized:
+        pis /= np.sum(pis)
+    assert np.isclose(np.sum(pis), 1.), "pis need to be normalized"
+
+    lnpdf  = lambda z: mog.mog_logprob(z, means, icovs, lndets, pis)
+    sample = lambda n: mog.mog_samples(n, means, chols, pis)
+    return lnpdf, sample
+
+
 def make_new_component_mixture_lnpdf(comp_list, new_rank=0):
     """ Create a mixture logpdf function that varies with new params, 
     and holds params in comp_list fixed.
