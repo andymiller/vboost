@@ -405,8 +405,11 @@ def make_mixture_elbo(lntarget, comp_list, new_rank,
         Neps     = num_new_component_samples
         eps_diag = np.random.randn(Neps, D)
         eps_lowr = np.random.randn(Neps, new_rank)
-        return lambda th, i, fixed_prob_new=None: mixture_elbo(th, i, eps_lowr=eps_lowr,
-                                                 eps_diag=eps_diag, fixed_prob_new=fixed_prob_new)
+        return lambda th, i, fixed_prob_new=None: \
+                    mixture_elbo(th, i,
+                                 eps_lowr = eps_lowr,
+                                 eps_diag = eps_diag,
+                                 fixed_prob_new=fixed_prob_new)
 
     return mixture_elbo
 

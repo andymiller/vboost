@@ -53,7 +53,7 @@ def mfvi_init(lnpdf, D, num_iters):
         return -1.*elbo_grad(lam, n_samps=1024) #args.vboost_nsamps)
 
     lam = np.random.randn(mfvi.num_variational_params) * .01
-    lam[D:] = -1.
+    lam[D:] = -2.
     mc_opt = FilteredOptimization(
                   mc_grad_fun,
                   lam.copy(),
@@ -61,7 +61,7 @@ def mfvi_init(lnpdf, D, num_iters):
                   grad_filter = AdamFilter(),
                   fun = lambda lam, t: mfvi.elbo_mc(lam, n_samps=1000),
                   callback=mfvi.callback)
-    mc_opt.run(num_iters=num_iters, step_size=.05)
+    mc_opt.run(num_iters=num_iters, step_size=.01)
     return mc_opt.params.copy()
 
 
@@ -81,7 +81,7 @@ if __name__=="__main__":
     ###############################################
     # BASE CASE: fit a single gaussian using BBVI #
     ###############################################
-    mfvi_lam  = mfvi_init(lnpdf, D, num_iters=400)
+    mfvi_lam  = mfvi_init(lnpdf, D, num_iters=1000)
     mfvi_comp = LRDComponent(D, rank=0, lam=mfvi_lam.copy())
 
     #####################
@@ -111,29 +111,29 @@ if __name__=="__main__":
         print "\n\n=========== iter %d ============="%k
         # initialize new comp w/ weighted EM scheme
         (init_prob, init_comp) = \
-            vbobj.fit_mvn_comp_iw_em(new_rank = mfvi_comp.rank,
-                                     num_samples=1000,
+            vbobj.fit_mvn_comp_iw_em(new_rank        = mfvi_comp.rank,
+                                     num_samples     = 5000,
                                      importance_dist = 'gauss-mixture',
-                                     use_max_sample=False)
-        init_prob = np.min([init_prob, .5])
+                                     use_max_sample  = False)
+        init_prob = np.min([init_prob, .75])
 
         # fit new component
-        vbobj.fit_new_comp(init_comp = init_comp,
-                           init_prob = init_prob,
-                           max_iter  = 1000,
-                           step_size = .05,
-                           num_new_component_samples    = 100,
-                           num_previous_mixture_samples = 100,
-                           fix_component_samples=True,
-                           gradient_type="component_approx_static_rho",
-                           break_condition='percent',
-                           verbose=True)
+        vbobj.fit_new_comp(
+                init_comp                    = init_comp,
+                init_prob                    = init_prob,
+                max_iter                     = 100,
+                step_size                    = .1,
+                num_new_component_samples    = 200,
+                num_previous_mixture_samples = 200,
+                fix_component_samples        = False,
+                gradient_type                = "standard", #"component_approx",
+                break_condition              = 'percent',
+                verbose=True)
 
-        comp_list = mog_bbvi.fit_mixture_weights(
-                        vbobj.comp_list, vbobj.lnpdf,
-                        num_iters=1000,
-                        step_size=.1,
-                        num_samps_per_component=100,
-                        ax=None)
-        vbobj.comp_list = comp_list
+        vbobj.comp_list = mog_bbvi.fit_mixture_weights(
+                            vbobj.comp_list,
+                            vbobj.lnpdf,
+                            num_iters=1000,
+                            step_size=.1,
+                            num_samps_per_component=100)
 
