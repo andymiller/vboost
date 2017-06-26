@@ -39,7 +39,7 @@ def process_dataset():
 
 df = process_dataset()
 
-def make_model_funs(crime=1., precinct_type=0):
+def make_model_funs(crime=1., precinct_type=1):
     """ crime: 1=violent, 2=weapons, 3=property, 4=drug
         eth  : 1=black, 2 = hispanic, 3=white
         precincts: 1-75
