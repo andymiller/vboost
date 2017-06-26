@@ -18,7 +18,6 @@ class DiagMvnBBVI(BBVI):
         Parameterizes with mean and log-std! (not variance!)
             lam = [mean, log-std]
         """
-        # base class sets up the gradient function organization
         super(DiagMvnBBVI, self).__init__(lnpdf, D, glnpdf, lnpdf_is_vectorized)
 
         # we note that the second two terms, with probability one, 

@@ -13,7 +13,7 @@ from .bbvi_base import BBVI
 
 class LowRankMvnBBVI(BBVI):
 
-    def __init__(self, lnpdf, D, r, **kwargs):
+    def __init__(self, lnpdf, D, r, glnpdf=None, lnpdf_is_vectorized=False):
         """
         Normal Variational Approximation with low rank covariance structure:
 
@@ -27,24 +27,30 @@ class LowRankMvnBBVI(BBVI):
             z = m + C*z_r + exp(.5*s)*z_D
 
         dg/dz = dlnpdf(z)/dz * dz/dlam - dlnq(z)/dz * dz/dlam - dlnq(z)/dlam
+        
+        Args:
+            - lnpdf: autograd-able function handle (unnormalized log prob over latent var z)
+            - D    : dimensionality of latent var z
+            - r    : rank of this approximation (between 0 and D)
+            - glnpdf : grad of lnpdf (not implemented)
+            - lnpdf_is_vectorized : True if 
         """
-        # base class sets up the gradient function organization
-        super(LowRankMvnBBVI, self).__init__(lnpdf, D, **kwargs)
-
-        # we note that the second two terms, with probability one, 
-        # create the vector [0, 0, 0, ..., 0, 1., 1., ..., 1.]
-        self.mask      = np.concatenate([np.zeros(D), np.ones(D)])
+        super(LowRankMvnBBVI, self).__init__(lnpdf, D, glnpdf, lnpdf_is_vectorized)
         self.D, self.r = D, r
 
-        # pack/unpack machinery
-        self.construct_C, self.num_C_params, self.C_slices = \
-            make_low_rank_constructor(self.D, self.r)
-
-        #self.num_variational_params = 2*D + self.num_C_params
+        # flat vector unpacking
         self.num_variational_params = 2*D + D*r
         self.m_slice = slice(0, D)
         self.v_slice = slice(D, 2*D)
         self.C_slice = slice(2*D, self.num_variational_params)
+
+        # TODO --- compare to identified low rank cholesky parameterization
+        # create the vector [0, 0, 0, ..., 0, 1., 1., ..., 1.]
+        #self.mask      = np.concatenate([np.zeros(D), np.ones(D)])
+        # pack/unpack machinery
+        #self.construct_C, self.num_C_params, self.C_slices = \
+        #    make_low_rank_constructor(self.D, self.r)
+        #self.num_variational_params = 2*D + self.num_C_params
 
     def unpack(self, lam):
         m, v, C = lam[self.m_slice], \
@@ -53,10 +59,7 @@ class LowRankMvnBBVI(BBVI):
         return m, v, C
 
     def pack(self, m, v, C):
-        # grab tril slices
-        #Clam = np.concatenate([ C[r+1:,r] for r in xrange(C.shape[1]) ])
-        #return np.concatenate([m, v, Clam])
-        return np.concatenate([m, v, C.ravel()])
+        return np.concatenate([m, v, np.ravel(C)])
 
     #############################################################
     # Elbo and elbo gradient methods                            #
@@ -71,22 +74,10 @@ class LowRankMvnBBVI(BBVI):
         return -1.*grad(self.elbo_mc)(lam, n_samps=n_samps)
         #return -1.*np.mean(self.dlnp(lam, eps) + self.mask, axis=0)
 
-    def elbo_grad_delta_approx(self, lam, t):
-        """ delta method approximation of the _negative_ ELBO """
-        gmu, gvar = self.delta_grad(lam)
-        return -1 * gmu
-
-    def elbo_grad_hybrid_approx(self, lam, t, rho = .5):
-        """ combine a sample w/ the elbo grad mean """
-        gmu, gvar = self.delta_grad(lam)
-        gmu   = -1. * gmu
-        gsamp = self.glnpdf_sample(lam, t)
-        return (rho*gsamp + (1-rho)*gmu)
-
     def elbo_mc(self, lam, n_samps=100, full_monte_carlo=False):
         """ approximate the ELBO with samples """
         zs = self.sample_z(lam, n_samps=n_samps)
-        m, v, C   = self.unpack(lam)
+        m, v, C = self.unpack(lam)
         if full_monte_carlo:
             elbo_vals = self.lnpdf(zs) - \
                 lowr_mvn.mvn_lowrank_logpdf(zs, m, C, v)
@@ -108,111 +99,13 @@ class LowRankMvnBBVI(BBVI):
         else:
             eps_r, eps_d = eps  # eps is a tuple here ---
         m, v, C = self.unpack(lam)
-        z = m + np.exp(.5*v)*eps_d + np.dot(eps_r, C.T)
+        if self.r > 0:
+            z = m + np.exp(.5*v)*eps_d + np.dot(eps_r, C.T)
+        else:
+            z = m + np.exp(.5*v)*eps_d
         return z
 
-    #####################################################
-    # internals                                         #
-    #####################################################
-    def dlnp(self, lam, eps):
-        """ the first gradient term (data term), computes
-                dlnp/dz * dz/dlambda
-
-            If `lnpdf` is vectorized ---, eps can 
-
-        Args:
-            lam = [mean, log-std], 2xD length array
-            eps = Nsamps x D matrix, for sampling randomness 
-                  z_0 ~ N(0,1)
-        """
-        m, v, C = self.unpack(lam)
-        z       = self.sample_z(lam, eps=eps)
-        dlnp_dz = self.glnpdf(z)
-
-        eps_rank, eps_diag = eps
-        dm = dlnp_dz
-        dv = dlnp_dz * eps_diag * np.exp(v)
-        dC = dlnp_dz[:,None] * eps_rank[None,:]   # outer product
-        return dm, dv, dC
-
-    def dlnp_delta_approx(self, lam):
-        """ compute the normal approximation to (dlnp_dz), 
-            z    ~ N(mu, s^2) implies approximately
-            g(z) ~ N(g(mu), (g'(mu) * s)^2)
-        """
-        D = len(lam)/2
-        gmu  = self.glnpdf(lam[:D])
-        gs   = self.gglnpdf(lam[:D]) * np.exp(lam[D:])
-        return gmu, gs
-
-    def delta_grad(self, lam):
-        gmu, gvar = self.dlnp_dlam_approx(lam)
-        return gmu + self.mask, gvar
-
-    def dlnp_dlam_approx(self, lam):
-        # compute the normal approximation to dlnp_dz)
-        D = len(lam)/2
-        mz, sz = self.dlnp_delta_approx(lam)
-
-        # mean/variance for mean component (m)
-        gmu_m  = mz
-        gvar_m = sz**2
-
-        # mean/variance for sigma component
-        #  --- the sigma component is essentially a location scaled xi
-        slam   = np.exp(lam[D:])
-        gmu_s  = sz * slam            # times e^lam for the transformation
-        gvar_s = (mz*mz + 3*sz*sz)*slam*slam
-
-        # multiply this by the 
-        return np.concatenate([gmu_m, gmu_s]), \
-               np.concatenate([gvar_m, gvar_s])
-
-    def nat_grad(self, lam, standard_grad):
-        """ pre-multiplies the inverse fisher at lam with the passed in
-        standard gradient
-
-            F = [ Sig^{-1};     0   ;        0;
-                  0       ;     F_v ;     F_vC;
-                  0       ;    F_vC ;     F_C  ]
-
-
-            F^{-1} = [ Sig    ;     0  ;      0;
-                      0       ;     ...;    ...;
-                      0       ;     ...;    ... ]
-
-        """
-        return standard_grad
-        m, v, C    = self.unpack(lam)
-        gm, gv, gC = self.unpack(standard_grad)
-
-        ## the mean parameter nat grad is premultiplied by Sig
-        ## this order never instantiates a DxD mat. Important! Not Sad!
-        nat_gm = np.dot(C, np.dot(C.T, gm)) + np.exp(v)*gm
-
-        ## compute approximate Inv Fish for variance parameters
-        #Sig_inv_diag = lowr_mvn.woodbury_invert_diag(C, v)
-        #F_v          = .5 * (Sig_inv_diag**2) * (np.exp(2*v))
-        ##nat_gv = (1./F_v) * gv
-        nat_gv  = .5 * gv
-
-        ## TODO: compute approximation to F_CC, (or rather, it's inverse...)
-        #F_v    = .5*(Sig_inv_diag**2)
-        #nat_gC = (1./F_v[:,None]) * gC
-        #nat_gC = standard_grad[self.C_slice]
-
-        ## construct the flattened gradient and return
-        return np.concatenate([nat_gm, nat_gv, gC.ravel()])
-
-
-    def fisher_info(self, lam):
-        """ full fisher information --- hessian of the differential
-        entropy
-        """
-        pass
-
-
-    def callback(self, th, t, g, tskip=1, n_samps=40):
+    def callback(self, th, t, g, tskip=20, n_samps=100):
         """ custom callback --- prints statistics of all gradient comps"""
         if t % tskip == 0:
             fval = self.elbo_mc(th, n_samps=n_samps)
@@ -221,6 +114,13 @@ class LowRankMvnBBVI(BBVI):
 
             m, v, C = self.unpack(th)
             Cmags   = np.sqrt(np.sum(C**2, axis=0))
+
+            if self.r > 0:
+                Cm ="%2.4f"%np.mean(gC),
+                Clo="%2.4f"%np.percentile(gC, 1.),
+                Chi="%2.4f"%np.percentile(gC, 99.),
+            else:
+                 Cm, Clo, Chi = "na", "na", "na"
 
             print \
 """
@@ -238,9 +138,7 @@ iter {t}; val = {val},
                 v  ="%2.4f"%np.mean(gv),
                 vlo="%2.4f"%np.percentile(gv, 1.),
                 vhi="%2.4f"%np.percentile(gv, 99.),
-                C  ="%2.4f"%np.mean(gC),
-                Clo="%2.4f"%np.percentile(gC, 1.),
-                Chi="%2.4f"%np.percentile(gC, 99.),
+                C  =Cm, Clo=Clo, Chi=Chi,
                 Cmags=np.str(Cmags))
 
 
@@ -268,7 +166,7 @@ def make_low_rank_constructor(D, rank):
         slices.append(sl)
 
     # num params that go into this C matrix
-    n_params = sl.stop
+    n_params = slices[-1].stop
 
     def construct_C(lam):
         Cs = []
