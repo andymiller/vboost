@@ -79,27 +79,49 @@ if __name__=="__main__":
     """.format(model=args.model, D=D, output_dir=args.output)
     print args
 
-
 # single component initialization
-def mfvi_init():
-    mfvi = vi.DiagMvnBBVI(lnpdf, D, lnpdf_is_vectorized=True)
-    elbo_grad = grad(mfvi.elbo_mc)
+def init_single_component(rank=0, niter=1000):
+    infobj = vi.LowRankMvnBBVI(lnpdf, D, r=rank, lnpdf_is_vectorized=True)
+    elbo_grad = grad(infobj.elbo_mc)
     def mc_grad_fun(lam, t):
-        return -1.*elbo_grad(lam, n_samps=1024) #args.vboost_nsamps)
+        return -1.*elbo_grad(lam, n_samps=1024)
 
-    niter = 1000
-    lam = np.random.randn(mfvi.num_variational_params) * .01
-    lam[D:] = -1.
+    # initialize var params
+    m0   = np.random.randn(D) * .01
+    C0   = np.random.randn(D, infobj.r) * .001
+    v0   = -3 * np.ones(D)
+    lam0 = infobj.pack(m0, v0, C0)
+
     mc_opt = FilteredOptimization(
-                  mc_grad_fun,
-                  lam.copy(),
-                  save_grads = False,
-                  grad_filter = AdamFilter(),
-                  fun = lambda lam, t: mfvi.elbo_mc(lam, n_samps=1000),
-                  callback=mfvi.callback)
+      mc_grad_fun,
+      lam0.copy(),
+      save_grads = False,
+      grad_filter = AdamFilter(),
+      fun = lambda lam, t: infobj.elbo_mc(lam, n_samps=1000),
+      callback=infobj.callback)
     mc_opt.run(num_iters=niter, step_size=.05)
-    return mc_opt.params.copy()
+    return mc_opt.params.copy(), infobj
 
+#def mfvi_init(niter=1000):
+#    mfvi = vi.DiagMvnBBVI(lnpdf, D, lnpdf_is_vectorized=True)
+#    elbo_grad = grad(mfvi.elbo_mc)
+#    def mc_grad_fun(lam, t):
+#        return -1.*elbo_grad(lam, n_samps=1024)
+#
+#    lam = np.random.randn(mfvi.num_variational_params) * .01
+#    lam[D:] = -1.
+#    mc_opt = FilteredOptimization( mc_grad_fun, lam.copy(),
+#      save_grads  = False,
+#      grad_filter = AdamFilter(),
+#      fun         = lambda lam, t: mfvi.elbo_mc(lam, n_samps=1000),
+#      callback    = lambda th, t, g: mfvi.callback(th, t, g, n_samps=1000))
+#    mc_opt.run(num_iters=niter, step_size=.05)
+#    return mc_opt.params.copy()
+#
+#
+#mfvi_params = mfvi_init()
+#lrd_params  = init_single_component(rank=0)
+#lrd_params  = init_single_component(rank=3)
 
 ###########################
 # Variational Boosting    #
@@ -107,14 +129,18 @@ def mfvi_init():
 
 if args.vboost:
 
-    # single component MFVI first
-    mfvi_lam  = mfvi_init()
-    mfvi_file = os.path.join(args.output, "mfvi.npy")
-    np.save(mfvi_file, mfvi_lam)
+    # initialize a single component of appropriate rank and cache
+    vi_params, infobj = init_single_component(rank=args.rank)
+    init_file = os.path.join(args.output, "initial_component-rank_%d.npy"%args.rank)
+    np.save(init_file, vi_params)
+
+    # initialize LRD component (works with MixtureVI ...)
+    comp     = LRDComponent(D, rank=rank)
+    m, d, C  = vi_params[:D], vi_params[D:(2*D)], vi_params[2*D:]
+    comp.lam = comp.setter(vi_params.copy(), mean=m, v=d, C=C)
 
     # Variational Boosting Object (with initial component
     from vbproj.vi.vboost import mog_bbvi
-    comp = LRDComponent(D, rank=0, lam=mfvi_lam)
     vbobj = vi.MixtureVI(lambda z, t: lnpdf(z),
                          D                     = D,
                          comp_list             = [(1., comp)],
