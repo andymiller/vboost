@@ -80,7 +80,7 @@ if __name__=="__main__":
     print args
 
 # single component initialization
-def init_single_component(rank=0, niter=1000):
+def init_single_component(rank=0, niter=2000):
     infobj = vi.LowRankMvnBBVI(lnpdf, D, r=rank, lnpdf_is_vectorized=True)
     elbo_grad = grad(infobj.elbo_mc)
     def mc_grad_fun(lam, t):
@@ -135,7 +135,7 @@ if args.vboost:
     np.save(init_file, vi_params)
 
     # initialize LRD component (works with MixtureVI ...)
-    comp     = LRDComponent(D, rank=rank)
+    comp     = LRDComponent(D, rank=args.rank)
     m, d, C  = vi_params[:D], vi_params[D:(2*D)], vi_params[2*D:]
     comp.lam = comp.setter(vi_params.copy(), mean=m, v=d, C=C)
 
@@ -149,6 +149,8 @@ if args.vboost:
 
     # iteratively add comps
     for k in xrange(args.ncomp):
+
+        print "======== adding component %d ==============="%k
 
         # initialize new comp w/ weighted EM scheme
         (init_prob, init_comp) = \
