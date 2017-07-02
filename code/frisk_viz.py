@@ -71,6 +71,18 @@ if __name__=="__main__":
     fig, axarr = plot_select_pairs(mcmc_df, [(1., comp)])
     fig.suptitle("Single rank %d component vs samples"%rank)
 
+    ######################################
+    # load in rank 3 frisk vboost comps  #
+    ######################################
+    with open("frisk_output/vboost_19-comp_%d-rank.pkl"%rank, "rb") as f:
+        raw_comp_list = pickle.load(f)
+        comp_list = [(p, components.LRDComponent(D, rank=rank, lam=c))
+                     for p, c in raw_comp_list]
+
+    fig, axarr = plot_select_pairs(mcmc_df, comp_list)
+    fig.suptitle("%d rank %d components vs samples"%(len(comp_list), rank)
+
+
     ###########################################
     # first compare marginal variances/stds   #
     ###########################################
