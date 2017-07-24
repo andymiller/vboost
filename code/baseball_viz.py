@@ -98,7 +98,7 @@ def compare_marginal(dimension, ax, chain, mfvi_comp=None, comp_list=None,
 
     # MoG marginal
     if comp_list is not None:
-        ax.hist(s, 50, normed=True, alpha=.5)
+        #ax.hist(s, 50, normed=True, alpha=.5)
         if comp_list is not None:
             marg_lnpdf = components.make_marginal(np.array([dimension]), comp_list)
         elif means is not None:
@@ -161,7 +161,4 @@ if __name__=="__main__":
 
     fig, ax = plt.figure(figsize=(8,6)), plt.gca()
     ax = plot_joint(ax, chain, comp_list)
-
-    #fig, ax = plt.figure(figsize=(8,6)), plt.gca()
-    #compare_marginal(dimension=1, ax=ax, chain=chain, mfvi_comp=comp, comp_list = comp_list)
 
