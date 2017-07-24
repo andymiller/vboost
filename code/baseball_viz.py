@@ -19,9 +19,9 @@ output_dir = "baseball_output"
 #  Plotting functions               #
 #####################################
 
-def plot_joint(ax, chain, comp_list=None, mod=None, plot_means=True):
+def plot_joint(ax, chain, comp_list=None, mod=None, plot_means=False):
     th_zero_kappa_marg = components.make_marginal(np.array([2, 1]), comp_list)
-    import aip.vboost.plots as pu
+    import vbproj.vi.vboost.plots as pu
     pu.plot_isocontours(ax=ax, func=lambda x: np.exp(th_zero_kappa_marg(x)), xlim=[-2,.5], ylim=[1,6])
     if chain is not None:
         ax.scatter(chain['logit_theta'][1000:,0], chain['log_kappa'][1000:], alpha=.2, c='grey')
@@ -135,7 +135,7 @@ if __name__=="__main__":
     with open(mcmc_file, 'rb') as f:
         nuts_dict = pickle.load(f)
 
-    chain = nuts_dict['chain']
+    chain = nuts_dict['chain'][10000:]
 
     ####################################
     # load and plot MFVI comparison    #
@@ -159,7 +159,9 @@ if __name__=="__main__":
         comp_list = [(p, components.LRDComponent(D, rank=rank, lam=c))
                      for p, c in raw_comp_list]
 
-    fig, axarr = plot_select_pairs(mcmc_df, comp_list)
-    fig.suptitle("%d rank %d components vs samples"%(len(comp_list), rank)
+    fig, ax = plt.figure(figsize=(8,6)), plt.gca()
+    ax = plot_joint(ax, chain, comp_list)
 
+    #fig, ax = plt.figure(figsize=(8,6)), plt.gca()
+    #compare_marginal(dimension=1, ax=ax, chain=chain, mfvi_comp=comp, comp_list = comp_list)
 
